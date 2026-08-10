@@ -154,3 +154,13 @@ class FunctionDetail(FunctionLibraryItem):
 class SearchResult(BaseModel):
     query: str
     results: list[FunctionLibraryItem]
+
+
+class AlgorithmItem(BaseModel):
+    slug: str
+    title: str
+    category: str
+    description: str
+    function_slug: str
+    time_complexity: TimeComplexity
+    space_complexity: SpaceComplexity

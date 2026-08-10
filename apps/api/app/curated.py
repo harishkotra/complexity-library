@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from app.analysis import analyze_python
-from app.domain import FunctionDetail, FunctionLibraryItem
+from app.domain import AlgorithmItem, FunctionDetail, FunctionLibraryItem
 from app.visualization import build_visualization
 
 
@@ -34,3 +34,19 @@ def curated_summaries() -> list[FunctionLibraryItem]:
 
 def curated_function(slug: str) -> FunctionDetail | None:
     return next((item for item in curated_functions() if item.slug == slug), None)
+
+
+def curated_algorithms() -> list[AlgorithmItem]:
+    catalog = (
+        ("linear-search", "Linear search", "Searching", "Visit each item until the target appears.", "python-linear-search"),
+        ("binary-search", "Binary search", "Searching", "Halve the sorted search interval on every comparison.", "python-binary-search"),
+        ("pair-comparison", "Pair comparison", "Arrays", "Compare each input value against every later value.", "python-pair-comparison"),
+        ("comparison-sort", "Comparison sort", "Sorting", "Order a collection using Python's built-in comparison sort.", "python-sort-reference"),
+        ("recursive-fibonacci", "Recursive Fibonacci", "Recursion", "See how two recursive branches expand the call tree.", "python-fibonacci-recursion"),
+    )
+    records: list[AlgorithmItem] = []
+    for slug, title, category, description, function_slug in catalog:
+        detail = curated_function(function_slug)
+        assert detail is not None
+        records.append(AlgorithmItem(slug=slug, title=title, category=category, description=description, function_slug=function_slug, time_complexity=detail.time_complexity, space_complexity=detail.space_complexity))
+    return records

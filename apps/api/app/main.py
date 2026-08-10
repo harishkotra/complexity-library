@@ -7,7 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
 from app.analysis import analyze_python, unsupported_analysis
-from app.domain import AnalysisJobResponse, AnalyzeRequest, AnalyzeResponse, FunctionDetail, FunctionLibraryItem, FunctionReference, SearchResult, SupportedLanguage
+from app.curated import curated_algorithms
+from app.domain import AlgorithmItem, AnalysisJobResponse, AnalyzeRequest, AnalyzeResponse, FunctionDetail, FunctionLibraryItem, FunctionReference, SearchResult, SupportedLanguage
 from app.jobs import job_store
 from app.observability import RequestObservabilityMiddleware, log_event
 from app.repositories import build_function_repository
@@ -115,3 +116,8 @@ def search(q: str, limit: int = 24) -> SearchResult:
     if not query:
         raise HTTPException(status_code=422, detail="Enter a search term.")
     return SearchResult(query=query, results=function_repository.list_published(limit=max(1, min(limit, 100)), query=query))
+
+
+@app.get("/api/algorithms", response_model=list[AlgorithmItem])
+def list_algorithms() -> list[AlgorithmItem]:
+    return curated_algorithms()

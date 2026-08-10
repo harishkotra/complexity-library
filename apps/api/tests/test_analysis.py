@@ -120,6 +120,12 @@ def test_library_filters_and_search_are_real_query_operations():
     assert [item["slug"] for item in result["results"]] == ["python-fibonacci-recursion"]
 
 
+def test_curated_algorithms_link_to_public_function_evidence():
+    algorithms = TestClient(app).get("/api/algorithms").json()
+    assert {item["slug"] for item in algorithms} >= {"linear-search", "binary-search", "recursive-fibonacci"}
+    assert next(item for item in algorithms if item["slug"] == "binary-search")["time_complexity"] == "O(log n)"
+
+
 def test_visualization_contract_rejects_unknown_fields():
     analysis = analyze_python("def first(items):\n    return items[0]\n")
     spec = build_visualization(analysis)

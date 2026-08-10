@@ -5,7 +5,7 @@ export default function Home() {
     <main className="app-shell">
       <nav className="nav" aria-label="Primary navigation">
         <a className="brand" href="#top"><span className="brand-mark">↗</span> Complexity<br /><em>Library</em></a>
-        <div className="nav-links"><a href="#analyze">Analyze</a><a href="/library">Library</a><a href="#learn">Learn</a></div>
+        <div className="nav-links"><a href="#analyze">Analyze</a><a href="/library">Library</a><a href="/algorithms">Algorithms</a><a href="#learn">Learn</a></div>
         <button className="nav-action">Browse examples <span>→</span></button>
       </nav>
 
