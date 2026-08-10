@@ -71,6 +71,32 @@ def test_decrementing_recursion_uses_linear_stack_space():
     assert analysis.space_complexity == SpaceComplexity.LINEAR
 
 
+@pytest.mark.parametrize(
+    ("name", "code", "time", "space"),
+    [
+        ("constant", "def first(items):\n    return items[0]\n", TimeComplexity.CONSTANT, SpaceComplexity.CONSTANT),
+        ("logarithmic", "def halve(n):\n    while n > 1:\n        n //= 2\n", TimeComplexity.LOGARITHMIC, SpaceComplexity.CONSTANT),
+        ("linear", "def scan(items):\n    for item in items:\n        print(item)\n", TimeComplexity.LINEAR, SpaceComplexity.CONSTANT),
+        ("n_log_n", "def sort_items(items):\n    return sorted(items)\n", TimeComplexity.N_LOG_N, SpaceComplexity.CONSTANT),
+        ("quadratic", "def pairs(items):\n    for left in items:\n        for right in items:\n            print(left, right)\n", TimeComplexity.QUADRATIC, SpaceComplexity.CONSTANT),
+        ("cubic", "def triples(items):\n    for a in items:\n        for b in items:\n            for c in items:\n                print(a, b, c)\n", TimeComplexity.CUBIC, SpaceComplexity.CONSTANT),
+        ("exponential", "def fib(n):\n    if n < 2:\n        return n\n    return fib(n - 1) + fib(n - 2)\n", TimeComplexity.EXPONENTIAL, SpaceComplexity.LINEAR),
+        ("factorial", "def permutations(items):\n    if not items:\n        return [[]]\n    result = []\n    for index in range(len(items)):\n        for rest in permutations(items[:index] + items[index + 1:]):\n            result.append([items[index]] + rest)\n    return result\n", TimeComplexity.FACTORIAL, SpaceComplexity.LINEAR),
+    ],
+)
+def test_complexity_fixture_matrix(name, code, time, space):
+    analysis = analyze_python(code)
+    assert analysis.time_complexity == time, name
+    assert analysis.space_complexity == space, name
+
+
+def test_unknown_calls_lower_confidence_and_state_a_limitation():
+    analysis = analyze_python("def transform_all(items):\n    for item in items:\n        transform(item)\n")
+    assert analysis.time_complexity == TimeComplexity.LINEAR
+    assert analysis.confidence < 0.85
+    assert "transform" in analysis.limitations[0]
+
+
 def test_ir_records_control_flow_with_source_locations():
     ir = build_python_ir("def scan(items):\n    for item in items:\n        if item < 0:\n            continue\n        if item == 3:\n            break\n    return None\n")
     assert ir.function_name == "scan"

@@ -31,6 +31,7 @@ class Facts:
     has_two_pointer_scan: bool = False
     has_sliding_window: bool = False
     recursive_halving: bool = False
+    recursive_call_inside_loop: bool = False
     halving_loop_depth: int = 0
     recursive_calls: int = 0
     allocations: int = 0
@@ -208,6 +209,8 @@ class PythonFactsVisitor(ast.NodeVisitor):
         name = self._call_name(node.func)
         if name == self._function_name:
             self.facts.recursive_calls += 1
+            if self._depth > 0:
+                self.facts.recursive_call_inside_loop = True
             if any(self._contains_halving_expression(argument) for argument in node.args):
                 self.facts.recursive_halving = True
         elif name in {"sorted", "sort"}:
@@ -275,7 +278,14 @@ class PythonFactsVisitor(ast.NodeVisitor):
 
 def _analysis_from_facts(facts: Facts, language: SupportedLanguage = SupportedLanguage.PYTHON) -> ComplexityAnalysis:
 
-    if facts.recursive_calls >= 2 and facts.recursive_halving:
+    if facts.recursive_call_inside_loop:
+        time, pattern, confidence, reason = (
+            TimeComplexity.FACTORIAL,
+            AlgorithmPattern.RECURSION,
+            0.76,
+            "A recursive call is made once for each remaining candidate, which matches permutation-style factorial growth.",
+        )
+    elif facts.recursive_calls >= 2 and facts.recursive_halving:
         time, pattern, confidence, reason = (
             TimeComplexity.N_LOG_N,
             AlgorithmPattern.DIVIDE_AND_CONQUER,
