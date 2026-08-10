@@ -58,6 +58,15 @@ The application works without an LLM configuration for supported deterministic P
 
 Python uses the standard AST. JavaScript and TypeScript use tree-sitter and currently support top-level function declarations, loops, nested loops, conventional binary search, direct recursion, array allocation, and built-in sorting recognition. Unsupported constructs reduce confidence only when they are encountered; the app does not claim support for languages it cannot parse.
 
+### Seed curated content
+
+After applying the Supabase migrations and setting the server-side Supabase credentials, seed the deterministic catalog:
+
+```bash
+cd apps/api
+uv run python -m scripts.seed_curated
+```
+
 ## Contributing
 
 Issues and pull requests are welcome. Keep user code and prompts untrusted, preserve the deterministic-first architecture, and add focused regression tests for every analysis rule or visualization contract change.
