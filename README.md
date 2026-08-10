@@ -52,6 +52,8 @@ cd ../web && ./node_modules/.bin/next build
 
 GitHub Actions runs the same API suite, shared schema typecheck, and production web build on every pull request and push to `main`.
 
+`pnpm install` also enables the repository pre-commit hook, which runs the web linter and API tests before a local commit.
+
 ## Run with containers
 
 ```bash

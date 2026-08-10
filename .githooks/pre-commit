@@ -1,0 +1,5 @@
+#!/bin/sh
+set -eu
+
+./apps/web/node_modules/.bin/eslint --config apps/web/eslint.config.mjs apps/web
+(cd apps/api && uv run pytest)

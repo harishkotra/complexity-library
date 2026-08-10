@@ -32,5 +32,6 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: ./apps/web/node_modules/.bin/eslint --config apps/web/eslint.config.mjs apps/web
       - run: ./apps/web/node_modules/.bin/tsc --project packages/visualization-schema/tsconfig.json
       - run: pnpm --filter @complexity-library/web build

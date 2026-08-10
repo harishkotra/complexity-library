@@ -5,6 +5,7 @@
   "scripts": {
     "dev:web": "pnpm --filter @complexity-library/web dev",
     "build": "pnpm --filter @complexity-library/web build",
-    "lint": "pnpm --filter @complexity-library/web lint"
+    "lint": "./apps/web/node_modules/.bin/eslint --config apps/web/eslint.config.mjs apps/web",
+    "prepare": "git config core.hooksPath .githooks"
   }
 }
