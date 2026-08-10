@@ -29,6 +29,9 @@ class Facts:
     has_sort: bool = False
     has_binary_search: bool = False
     has_two_pointer_scan: bool = False
+    has_sliding_window: bool = False
+    recursive_halving: bool = False
+    halving_loop_depth: int = 0
     recursive_calls: int = 0
     allocations: int = 0
     unknown_calls: list[str] = field(default_factory=list)
@@ -157,10 +160,13 @@ class PythonFactsVisitor(ast.NodeVisitor):
         self.facts.source_facts.append(SourceFact("while_loop", node.lineno, node.col_offset))
         if self._contains_halving_assignment(node):
             self.facts.has_halving_loop = True
+            self.facts.halving_loop_depth = max(self.facts.halving_loop_depth, self._depth)
         if self._looks_like_binary_search(node):
             self.facts.has_binary_search = True
         if self._looks_like_two_pointer_scan(node):
             self.facts.has_two_pointer_scan = True
+        if self._looks_like_sliding_window(node):
+            self.facts.has_sliding_window = True
         self.generic_visit(node)
         self._depth -= 1
 
@@ -202,6 +208,8 @@ class PythonFactsVisitor(ast.NodeVisitor):
         name = self._call_name(node.func)
         if name == self._function_name:
             self.facts.recursive_calls += 1
+            if any(self._contains_halving_expression(argument) for argument in node.args):
+                self.facts.recursive_halving = True
         elif name in {"sorted", "sort"}:
             self.facts.has_sort = True
             self.facts.operations.append("sort")
@@ -231,6 +239,10 @@ class PythonFactsVisitor(ast.NodeVisitor):
         return False
 
     @staticmethod
+    def _contains_halving_expression(node: ast.AST) -> bool:
+        return any(isinstance(child, ast.BinOp) and isinstance(child.op, (ast.FloorDiv, ast.Div)) and isinstance(child.right, ast.Constant) and child.right.value == 2 for child in ast.walk(node))
+
+    @staticmethod
     def _looks_like_binary_search(node: ast.While) -> bool:
         """Recognize the conventional low/high/mid loop without executing it."""
         has_midpoint = False
@@ -255,10 +267,22 @@ class PythonFactsVisitor(ast.NodeVisitor):
                     names.add(child.target.id.lower())
         return len(names) >= 2
 
+    @staticmethod
+    def _looks_like_sliding_window(node: ast.While) -> bool:
+        names = {child.target.id.lower() for child in ast.walk(node) if isinstance(child, ast.AugAssign) and isinstance(child.target, ast.Name)}
+        return bool(names & {"left", "start"}) and bool(names & {"right", "end"}) and any(isinstance(child, ast.If) for child in ast.walk(node))
+
 
 def _analysis_from_facts(facts: Facts, language: SupportedLanguage = SupportedLanguage.PYTHON) -> ComplexityAnalysis:
 
-    if facts.recursive_calls >= 2:
+    if facts.recursive_calls >= 2 and facts.recursive_halving:
+        time, pattern, confidence, reason = (
+            TimeComplexity.N_LOG_N,
+            AlgorithmPattern.DIVIDE_AND_CONQUER,
+            0.72,
+            "The function makes multiple recursively halved calls; the final cost depends on combine work, so this is a conservative divide-and-conquer estimate.",
+        )
+    elif facts.recursive_calls >= 2:
         time, pattern, confidence, reason = (
             TimeComplexity.EXPONENTIAL,
             AlgorithmPattern.RECURSION,
@@ -282,9 +306,16 @@ def _analysis_from_facts(facts: Facts, language: SupportedLanguage = SupportedLa
     elif facts.has_binary_search:
         time, pattern, confidence, reason = (
             TimeComplexity.LOGARITHMIC,
-            AlgorithmPattern.LOGARITHMIC_HALVING,
+            AlgorithmPattern.BINARY_SEARCH,
             0.96,
             "The low/high bounds converge through a midpoint, which is the binary-search halving pattern.",
+        )
+    elif facts.has_halving_loop and facts.halving_loop_depth >= 2:
+        time, pattern, confidence, reason = (
+            TimeComplexity.N_LOG_N,
+            AlgorithmPattern.DIVIDE_AND_CONQUER,
+            0.90,
+            "A linear outer traversal contains a logarithmic halving loop, producing n log n work.",
         )
     elif facts.has_halving_loop:
         time, pattern, confidence, reason = (
@@ -307,6 +338,20 @@ def _analysis_from_facts(facts: Facts, language: SupportedLanguage = SupportedLa
             0.94,
             "Nested iteration visits a pair of positions for each input element, producing quadratic work.",
         )
+    elif facts.has_sliding_window:
+        time, pattern, confidence, reason = (
+            TimeComplexity.LINEAR,
+            AlgorithmPattern.SLIDING_WINDOW,
+            0.82,
+            "The left and right bounds advance through the input without restarting the traversal.",
+        )
+    elif facts.has_two_pointer_scan:
+        time, pattern, confidence, reason = (
+            TimeComplexity.LINEAR,
+            AlgorithmPattern.TWO_POINTER,
+            0.86,
+            "Two bounds converge through the input, so each position is visited a bounded number of times.",
+        )
     elif facts.loop_depth == 1 or facts.recursive_calls == 1:
         time, pattern, confidence, reason = (
             TimeComplexity.LINEAR,
@@ -327,7 +372,7 @@ def _analysis_from_facts(facts: Facts, language: SupportedLanguage = SupportedLa
         confidence = min(confidence, 0.72)
         limitations.append(f"The cost of {', '.join(sorted(set(facts.unknown_calls)))}() could not be determined locally.")
     assumptions = ["Built-in sort operations are treated as O(n log n)."] if facts.has_sort else []
-    space = SpaceComplexity.LINEAR if facts.allocations else (SpaceComplexity.LOGARITHMIC if facts.recursive_calls else SpaceComplexity.CONSTANT)
+    space = SpaceComplexity.LINEAR if facts.allocations or (facts.recursive_calls and not facts.recursive_halving) else (SpaceComplexity.LOGARITHMIC if facts.recursive_calls else SpaceComplexity.CONSTANT)
     return ComplexityAnalysis(
         time_complexity=time,
         space_complexity=space,

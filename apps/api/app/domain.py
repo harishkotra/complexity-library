@@ -39,6 +39,9 @@ class AlgorithmPattern(StrEnum):
     NESTED_LOOP = "nested_loop"
     DIVIDE_AND_CONQUER = "divide_and_conquer"
     RECURSION = "recursion"
+    TWO_POINTER = "two_pointer"
+    SLIDING_WINDOW = "sliding_window"
+    BINARY_SEARCH = "binary_search"
     UNKNOWN = "unknown"
 
 

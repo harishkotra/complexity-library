@@ -17,7 +17,7 @@ from app.main import app
         ("def halve(n):\n    while n > 1:\n        n //= 2\n", TimeComplexity.LOGARITHMIC, AlgorithmPattern.LOGARITHMIC_HALVING),
         ("def ordered(items):\n    return sorted(items)\n", TimeComplexity.N_LOG_N, AlgorithmPattern.DIVIDE_AND_CONQUER),
         ("def cube(items):\n    for a in items:\n        for b in items:\n            for c in items:\n                print(a, b, c)\n", TimeComplexity.CUBIC, AlgorithmPattern.NESTED_LOOP),
-        ("def binary(items, target):\n    low, high = 0, len(items) - 1\n    while low <= high:\n        mid = (low + high) // 2\n        if items[mid] < target:\n            low = mid + 1\n        else:\n            high = mid - 1\n    return -1\n", TimeComplexity.LOGARITHMIC, AlgorithmPattern.LOGARITHMIC_HALVING),
+        ("def binary(items, target):\n    low, high = 0, len(items) - 1\n    while low <= high:\n        mid = (low + high) // 2\n        if items[mid] < target:\n            low = mid + 1\n        else:\n            high = mid - 1\n    return -1\n", TimeComplexity.LOGARITHMIC, AlgorithmPattern.BINARY_SEARCH),
     ],
 )
 def test_supported_patterns(code, time, pattern):
@@ -49,6 +49,25 @@ def test_normalization_and_fingerprint_ignore_local_identifier_names():
 def test_sequential_loops_remain_linear_not_quadratic():
     analysis = analyze_python("def twice(items):\n    for item in items:\n        print(item)\n    for item in items:\n        print(item)\n")
     assert analysis.time_complexity == TimeComplexity.LINEAR
+
+
+def test_linear_outer_loop_with_halving_inner_loop_is_n_log_n():
+    analysis = analyze_python("def levels(items, n):\n    for item in items:\n        size = n\n        while size > 1:\n            size //= 2\n")
+    assert analysis.time_complexity == TimeComplexity.N_LOG_N
+
+
+def test_two_pointer_and_sliding_window_patterns_remain_linear():
+    two_pointer = analyze_python("def pair(items):\n    left, right = 0, len(items) - 1\n    while left < right:\n        left += 1\n        right -= 1\n")
+    sliding_window = analyze_python("def window(items):\n    left, right = 0, 0\n    while right < len(items):\n        right += 1\n        if right - left > 3:\n            left += 1\n")
+    assert two_pointer.pattern == AlgorithmPattern.TWO_POINTER
+    assert sliding_window.pattern == AlgorithmPattern.SLIDING_WINDOW
+    assert two_pointer.time_complexity == sliding_window.time_complexity == TimeComplexity.LINEAR
+
+
+def test_decrementing_recursion_uses_linear_stack_space():
+    analysis = analyze_python("def count(n):\n    if n <= 0:\n        return 0\n    return count(n - 1)\n")
+    assert analysis.time_complexity == TimeComplexity.LINEAR
+    assert analysis.space_complexity == SpaceComplexity.LINEAR
 
 
 def test_ir_records_control_flow_with_source_locations():
