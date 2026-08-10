@@ -4,7 +4,8 @@
 
 It is deliberately not a chatbot. For supported code, the deterministic parser and rule engine are the source of truth; no submitted code is executed, and no LLM is required to use the product.
 
-> Built by [Harish Kotra](https://harishkotra.me) · [Check out my other builds](https://dailybuild.xyz)
+<img width="1136" height="720" alt="Cap 2026-08-10 at 23 43 21" src="https://github.com/user-attachments/assets/5109a9f5-5e3f-48fb-a376-a3b76dcf4f95" />
+
 
 ## What works today
 
