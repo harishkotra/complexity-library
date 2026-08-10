@@ -87,7 +87,29 @@ Issues and pull requests are welcome. Keep user code and prompts untrusted, pres
 
 ## Current slice
 
-The initial slice supports deterministic Python analysis of straightforward constant, linear, logarithmic, n-log-n, quadratic, cubic, and recursive functions. It deliberately does not execute submitted code or call an LLM.
+The initial slice supports deterministic Python, JavaScript, and TypeScript analysis of straightforward constant, linear, logarithmic, n-log-n, quadratic, cubic, and recursive functions. It deliberately does not execute submitted code or call an LLM.
+
+## Roadmap
+
+The working MVP is available now. The remaining V1 work is tracked in GitHub issues, with the local `TASKS.md` retaining detailed acceptance evidence.
+
+### Highest-priority contributions
+
+- **Analysis correctness:** multi-function selection, richer control-flow/space analysis, symbolic composition, and fixture coverage.
+- **Safe durable platform:** Supabase migration rehearsal, Redis-backed limits/queues, idempotent persistence, and reconnectable analysis jobs.
+- **Usable discovery:** public-detail metadata, pagination, PostgreSQL full-text search, and unified function/algorithm/lesson/tag search.
+- **Visualization and accessibility:** validated template traces, renderer state coverage, sorting/graph templates, E2E, a11y, and responsive review.
+
+### Later V1 capabilities
+
+- Curated algorithms/lessons with publication workflow and a launch-sized dataset.
+- Deterministic similarity persistence and optional pgvector embeddings.
+- Constrained Agno provider fallback, moderation, observability, and a minimal admin workflow.
+- Production rehearsal: container verification, load budgets, deployment/runbook, and acceptance testing.
+
+### Contributing
+
+Browse [open issues](https://github.com/harishkotra/complexity-library/issues) by `area:*`, `priority:*`, `good first issue`, and `help wanted`. Each issue links back to its task ID and lists its dependencies and acceptance criteria. Deferred ideas are labeled `deferred` and are intentionally outside V1.
 
 ## License
 
