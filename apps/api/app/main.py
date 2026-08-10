@@ -8,7 +8,7 @@ from fastapi.responses import StreamingResponse
 
 from app.analysis import analyze_code
 from app.curated import curated_algorithms
-from app.domain import AlgorithmItem, AnalysisJobResponse, AnalyzeRequest, AnalyzeResponse, FunctionDetail, FunctionLibraryItem, FunctionReference, SearchResult, SupportedLanguage
+from app.domain import AlgorithmItem, AnalysisJobResponse, AnalyzeRequest, AnalyzeResponse, FunctionDetail, FunctionLibraryItem, FunctionReference, SearchResult, SubmissionStatus, SupportedLanguage
 from app.jobs import job_store
 from app.observability import RequestObservabilityMiddleware, log_event
 from app.repositories import build_anonymous_session_repository, build_function_repository
@@ -110,6 +110,17 @@ def function_detail(slug: str) -> FunctionDetail:
     if not detail:
         raise HTTPException(status_code=404, detail="Published function not found.")
     return detail
+
+
+@app.get("/api/functions/submissions/{function_id}", response_model=SubmissionStatus)
+def submission_status(function_id: str, response: Response, anonymous_session: str | None = Cookie(default=None, alias="cl_session")) -> SubmissionStatus:
+    if not anonymous_session:
+        raise HTTPException(status_code=404, detail="Submission not found.")
+    session_id = anonymous_session_repository.ensure(anonymous_session).id
+    status = function_repository.get_for_owner(function_id, session_id)
+    if not status:
+        raise HTTPException(status_code=404, detail="Submission not found.")
+    return status
 
 
 @app.get("/api/search", response_model=SearchResult)

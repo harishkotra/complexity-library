@@ -9,7 +9,7 @@ from typing import Literal, Protocol
 
 from app.analysis import fingerprint_code, normalize_code
 from app.curated import curated_function, curated_summaries
-from app.domain import AnalyzeRequest, ComplexityAnalysis, FunctionDetail, FunctionLibraryItem, VisualizationSpec
+from app.domain import AnalyzeRequest, ComplexityAnalysis, FunctionDetail, FunctionLibraryItem, SubmissionStatus, VisualizationSpec
 from app.settings import Settings
 
 ANALYZER_VERSION = "1"
@@ -23,6 +23,8 @@ class PersistedFunction:
     language: str
     cache_hit: bool
     durable: bool
+    status: str = "processing"
+    moderation_status: str = "pending"
 
 
 @dataclass(frozen=True)
@@ -41,6 +43,7 @@ class FunctionRepository(Protocol):
     ) -> PersistedFunction: ...
     def list_published(self, limit: int = 24, query: str | None = None, language: str | None = None, time_complexity: str | None = None, pattern: str | None = None, sort: Literal["newest", "complexity"] = "newest") -> list[FunctionLibraryItem]: ...
     def get_published(self, slug: str) -> FunctionDetail | None: ...
+    def get_for_owner(self, function_id: str, anonymous_session_id: str) -> SubmissionStatus | None: ...
 
 
 class AnonymousSessionRepository(Protocol):
@@ -61,6 +64,7 @@ class InMemoryFunctionRepository:
 
     def __init__(self) -> None:
         self._by_key: dict[str, PersistedFunction] = {}
+        self._by_id: dict[str, tuple[PersistedFunction, str | None]] = {}
 
     def find_or_create(self, request: AnalyzeRequest, analysis: ComplexityAnalysis, visualization: VisualizationSpec, anonymous_session_id: str | None = None) -> PersistedFunction:
         normalized = normalize_code(request.language, request.code)
@@ -71,6 +75,7 @@ class InMemoryFunctionRepository:
         title = request.title.strip() if request.title else "Untitled function"
         stored = PersistedFunction(id=str(uuid.uuid4()), slug=f"{_slugify(title)}-{key[:7]}", title=title, language=request.language.value, cache_hit=False, durable=False)
         self._by_key[key] = stored
+        self._by_id[stored.id] = (stored, anonymous_session_id)
         return stored
 
     def list_published(self, limit: int = 24, query: str | None = None, language: str | None = None, time_complexity: str | None = None, pattern: str | None = None, sort: Literal["newest", "complexity"] = "newest") -> list[FunctionLibraryItem]:
@@ -92,6 +97,13 @@ class InMemoryFunctionRepository:
 
     def get_published(self, slug: str) -> FunctionDetail | None:
         return curated_function(slug)
+
+    def get_for_owner(self, function_id: str, anonymous_session_id: str) -> SubmissionStatus | None:
+        record = self._by_id.get(function_id)
+        if not record or record[1] != anonymous_session_id:
+            return None
+        stored = record[0]
+        return SubmissionStatus(id=stored.id, slug=stored.slug, status=stored.status, moderation_status=stored.moderation_status, durable=False)
 
 
 class InMemoryAnonymousSessionRepository:
@@ -172,6 +184,12 @@ class SupabaseFunctionRepository:
         if not record:
             return None
         return FunctionDetail.model_validate({**self._summary(record).model_dump(), "prompt": record.get("prompt"), "code": record["code"], "analysis": record["analysis"], "visualization": record["visualization_spec"]})
+
+    def get_for_owner(self, function_id: str, anonymous_session_id: str) -> SubmissionStatus | None:
+        record = self.client.table("functions").select("id,slug,status,moderation_status").eq("id", function_id).eq("anonymous_session_id", anonymous_session_id).maybe_single().execute().data
+        if not record:
+            return None
+        return SubmissionStatus(id=record["id"], slug=record["slug"], status=record["status"], moderation_status=record["moderation_status"], durable=True)
 
 
 class SupabaseAnonymousSessionRepository:

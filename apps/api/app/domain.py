@@ -121,6 +121,14 @@ class FunctionReference(BaseModel):
     durable: bool
 
 
+class SubmissionStatus(BaseModel):
+    id: str
+    slug: str
+    status: Literal["processing", "published", "rejected", "removed", "failed"]
+    moderation_status: Literal["pending", "allowed", "review", "blocked"]
+    durable: bool
+
+
 class AnalyzeResponse(BaseModel):
     analysis: ComplexityAnalysis
     visualization: VisualizationSpec

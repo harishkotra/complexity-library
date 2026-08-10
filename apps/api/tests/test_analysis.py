@@ -135,6 +135,17 @@ def test_anonymous_session_repository_is_stable_without_exposing_the_token():
     assert "opaque-browser-token" not in repr(first)
 
 
+def test_submission_status_is_visible_only_to_the_owning_anonymous_session():
+    owner = TestClient(app)
+    created = owner.post("/api/functions/analyze", json={"language": "python", "code": "def item(items):\n    return items[0]\n"})
+    function_id = created.json()["function"]["id"]
+    status = owner.get(f"/api/functions/submissions/{function_id}")
+    assert status.status_code == 200
+    assert status.json()["status"] == "processing"
+    stranger = TestClient(app)
+    assert stranger.get(f"/api/functions/submissions/{function_id}").status_code == 404
+
+
 def test_analysis_endpoint_returns_a_valid_visualization_contract():
     response = TestClient(app).post(
         "/api/functions/analyze",
