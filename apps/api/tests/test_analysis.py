@@ -6,6 +6,7 @@ from app.analysis import analyze_code, analyze_python, build_python_ir, fingerpr
 from app.domain import AlgorithmPattern, SpaceComplexity, TimeComplexity
 from app.visualization import build_visualization
 from app.main import app
+from app.repositories import InMemoryAnonymousSessionRepository
 
 
 @pytest.mark.parametrize(
@@ -97,6 +98,15 @@ def test_javascript_submission_uses_the_same_typed_api_contract():
     response = TestClient(app).post("/api/functions/analyze", json={"language": "javascript", "code": "function first(items) { return items[0]; }"})
     assert response.status_code == 200
     assert response.json()["analysis"]["time_complexity"] == "O(1)"
+
+
+def test_anonymous_session_repository_is_stable_without_exposing_the_token():
+    sessions = InMemoryAnonymousSessionRepository()
+    first = sessions.ensure("opaque-browser-token")
+    second = sessions.ensure("opaque-browser-token")
+    assert first.id == second.id
+    assert first.durable is False
+    assert "opaque-browser-token" not in repr(first)
 
 
 def test_analysis_endpoint_returns_a_valid_visualization_contract():

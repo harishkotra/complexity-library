@@ -11,7 +11,7 @@ from app.curated import curated_algorithms
 from app.domain import AlgorithmItem, AnalysisJobResponse, AnalyzeRequest, AnalyzeResponse, FunctionDetail, FunctionLibraryItem, FunctionReference, SearchResult, SupportedLanguage
 from app.jobs import job_store
 from app.observability import RequestObservabilityMiddleware, log_event
-from app.repositories import build_function_repository
+from app.repositories import build_anonymous_session_repository, build_function_repository
 from app.sessions import create_anonymous_session, hash_anonymous_session
 from app.settings import get_settings
 from app.visualization import build_visualization
@@ -19,6 +19,7 @@ from app.visualization import build_visualization
 app = FastAPI(title="Complexity Library API", version="0.1.0")
 settings = get_settings()
 function_repository = build_function_repository(settings)
+anonymous_session_repository = build_anonymous_session_repository(settings)
 app.add_middleware(RequestObservabilityMiddleware)
 app.add_middleware(
     CORSMiddleware,
@@ -45,22 +46,22 @@ def ensure_anonymous_session(response: Response, anonymous_session: str | None) 
     return session.token
 
 
-def perform_analysis(request: AnalyzeRequest, session_token: str | None = None) -> AnalyzeResponse:
+def perform_analysis(request: AnalyzeRequest, anonymous_session_id: str | None = None) -> AnalyzeResponse:
     try:
         analysis = analyze_code(request.language, request.code)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     visualization = build_visualization(analysis)
-    stored = function_repository.find_or_create(request, analysis, visualization)
+    stored = function_repository.find_or_create(request, analysis, visualization, anonymous_session_id)
     log_event("analysis.completed", language=request.language.value, complexity=analysis.time_complexity, confidence=analysis.confidence, cache_hit=stored.cache_hit, durable=stored.durable)
     return AnalyzeResponse(analysis=analysis, visualization=visualization, stages=STAGES, function=FunctionReference(**stored.__dict__))
 
 
-def run_analysis_job(job_id: str, request: AnalyzeRequest, session_token: str) -> None:
+def run_analysis_job(job_id: str, request: AnalyzeRequest, anonymous_session_id: str) -> None:
     try:
         for stage in STAGES[:3]:
             job_store.emit(job_id, "stage", {"label": stage})
-        result = perform_analysis(request, session_token)
+        result = perform_analysis(request, anonymous_session_id)
         for stage in STAGES[3:]:
             job_store.emit(job_id, "stage", {"label": stage})
         job_store.complete(job_id, result.model_dump(mode="json"))
@@ -79,14 +80,15 @@ def health() -> dict[str, str | bool | int | float]:
 @app.post("/api/functions/analyze", response_model=AnalyzeResponse)
 def analyze(request: AnalyzeRequest, response: Response, anonymous_session: str | None = Cookie(default=None, alias="cl_session")) -> AnalyzeResponse:
     session_token = ensure_anonymous_session(response, anonymous_session)
-    return perform_analysis(request, session_token)
+    return perform_analysis(request, anonymous_session_repository.ensure(session_token).id)
 
 
 @app.post("/api/functions/analyses", response_model=AnalysisJobResponse, status_code=202)
 def create_analysis_job(request: AnalyzeRequest, background_tasks: BackgroundTasks, response: Response, anonymous_session: str | None = Cookie(default=None, alias="cl_session")) -> AnalysisJobResponse:
     session_token = ensure_anonymous_session(response, anonymous_session)
+    session = anonymous_session_repository.ensure(session_token)
     job = job_store.create(hash_anonymous_session(session_token))
-    background_tasks.add_task(run_analysis_job, job.id, request, session_token)
+    background_tasks.add_task(run_analysis_job, job.id, request, session.id)
     return AnalysisJobResponse(id=job.id, status="queued", events_url=f"/api/functions/analyses/{job.id}/events")
 
 

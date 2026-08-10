@@ -4,6 +4,7 @@ import hashlib
 import re
 import uuid
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from typing import Literal, Protocol
 
 from app.analysis import fingerprint_code, normalize_code
@@ -24,6 +25,12 @@ class PersistedFunction:
     durable: bool
 
 
+@dataclass(frozen=True)
+class PersistedAnonymousSession:
+    id: str
+    durable: bool
+
+
 class FunctionRepository(Protocol):
     def find_or_create(
         self,
@@ -34,6 +41,10 @@ class FunctionRepository(Protocol):
     ) -> PersistedFunction: ...
     def list_published(self, limit: int = 24, query: str | None = None, language: str | None = None, time_complexity: str | None = None, pattern: str | None = None, sort: Literal["newest", "complexity"] = "newest") -> list[FunctionLibraryItem]: ...
     def get_published(self, slug: str) -> FunctionDetail | None: ...
+
+
+class AnonymousSessionRepository(Protocol):
+    def ensure(self, token: str) -> PersistedAnonymousSession: ...
 
 
 def _slugify(value: str) -> str:
@@ -81,6 +92,17 @@ class InMemoryFunctionRepository:
 
     def get_published(self, slug: str) -> FunctionDetail | None:
         return curated_function(slug)
+
+
+class InMemoryAnonymousSessionRepository:
+    def __init__(self) -> None:
+        self._sessions: dict[str, PersistedAnonymousSession] = {}
+
+    def ensure(self, token: str) -> PersistedAnonymousSession:
+        token_hash = _source_hash(token)
+        if token_hash not in self._sessions:
+            self._sessions[token_hash] = PersistedAnonymousSession(id=str(uuid.uuid4()), durable=False)
+        return self._sessions[token_hash]
 
 
 class SupabaseFunctionRepository:
@@ -152,5 +174,26 @@ class SupabaseFunctionRepository:
         return FunctionDetail.model_validate({**self._summary(record).model_dump(), "prompt": record.get("prompt"), "code": record["code"], "analysis": record["analysis"], "visualization": record["visualization_spec"]})
 
 
+class SupabaseAnonymousSessionRepository:
+    def __init__(self, settings: Settings) -> None:
+        from supabase import create_client
+
+        if not settings.supabase_url or not settings.supabase_service_role_key:
+            raise ValueError("Supabase URL and server-side service role key are required for durable sessions.")
+        self.client = create_client(settings.supabase_url, settings.supabase_service_role_key)
+
+    def ensure(self, token: str) -> PersistedAnonymousSession:
+        token_hash = _source_hash(token)
+        existing = self.client.table("anonymous_sessions").select("id").eq("token_hash", token_hash).maybe_single().execute().data
+        if existing:
+            return PersistedAnonymousSession(id=existing["id"], durable=True)
+        created = self.client.table("anonymous_sessions").insert({"token_hash": token_hash, "expires_at": (datetime.now(UTC) + timedelta(days=30)).isoformat()}).execute().data[0]
+        return PersistedAnonymousSession(id=created["id"], durable=True)
+
+
 def build_function_repository(settings: Settings) -> FunctionRepository:
     return SupabaseFunctionRepository(settings) if settings.supabase_url and settings.supabase_service_role_key else InMemoryFunctionRepository()
+
+
+def build_anonymous_session_repository(settings: Settings) -> AnonymousSessionRepository:
+    return SupabaseAnonymousSessionRepository(settings) if settings.supabase_url and settings.supabase_service_role_key else InMemoryAnonymousSessionRepository()
