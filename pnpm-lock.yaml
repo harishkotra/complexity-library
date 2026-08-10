@@ -38,6 +38,8 @@ importers:
         specifier: ^5.7.0
         version: 5.9.3
 
+  packages/visualization-schema: {}
+
 packages:
 
   '@babel/code-frame@7.29.7':
