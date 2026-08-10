@@ -158,6 +158,25 @@ def test_submission_honeypot_is_rejected_before_analysis():
     assert response.status_code == 400
 
 
+def test_submission_validation_returns_field_errors_for_invalid_inputs():
+    response = TestClient(app).post("/api/functions/analyze", json={"language": "ruby", "code": "   ", "title": "x" * 121})
+    assert response.status_code == 422
+    fields = {tuple(error["loc"]) for error in response.json()["detail"]}
+    assert ("body", "language") in fields
+    assert ("body", "code") in fields
+    assert ("body", "title") in fields
+
+
+def test_declared_oversized_submission_body_is_rejected_before_parsing():
+    response = TestClient(app).post(
+        "/api/functions/analyze",
+        content="{}",
+        headers={"Content-Type": "application/json", "Content-Length": "100001"},
+    )
+    assert response.status_code == 413
+    assert response.json()["detail"] == "Request body exceeds the allowed size."
+
+
 def test_analysis_endpoint_returns_a_valid_visualization_contract():
     response = TestClient(app).post(
         "/api/functions/analyze",

@@ -4,7 +4,7 @@ from typing import Literal
 
 from fastapi import BackgroundTasks, Cookie, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
 from app.analysis import analyze_code
 from app.curated import curated_algorithms
@@ -31,6 +31,15 @@ app.add_middleware(
     allow_methods=["GET", "POST"],
     allow_headers=["Content-Type"],
 )
+
+
+@app.middleware("http")
+async def reject_oversized_request_bodies(request: Request, call_next):
+    """Reject oversized declared request bodies before JSON parsing or analysis."""
+    content_length = request.headers.get("content-length")
+    if content_length and content_length.isdigit() and int(content_length) > settings.max_request_body_bytes:
+        return JSONResponse(status_code=413, content={"detail": "Request body exceeds the allowed size."})
+    return await call_next(request)
 
 STAGES = [
     "Parsed function",

@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:3000"
     analysis_confidence_threshold: float = Field(default=0.85, ge=0, le=1)
     max_code_characters: int = Field(default=20_000, ge=100, le=200_000)
+    max_request_body_bytes: int = Field(default=100_000, ge=1_024, le=2_000_000)
     anonymous_analysis_limit: int = Field(default=12, ge=1, le=1000)
     anonymous_analysis_window_seconds: int = Field(default=3600, ge=1, le=86_400)
     llm_enabled: bool = False
@@ -38,6 +39,7 @@ class Settings(BaseSettings):
             "llm_provider": self.llm_provider if self.llm_enabled else "disabled",
             "analysis_confidence_threshold": self.analysis_confidence_threshold,
             "max_code_characters": self.max_code_characters,
+            "max_request_body_bytes": self.max_request_body_bytes,
             "supabase_configured": bool(self.supabase_url),
             "redis_configured": bool(self.redis_url),
         }
