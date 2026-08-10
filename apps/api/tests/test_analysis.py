@@ -153,6 +153,11 @@ def test_analysis_returns_deterministic_similarity_evidence():
     assert "Same normalized syntax structure" in similar[0]["reasons"]
 
 
+def test_submission_honeypot_is_rejected_before_analysis():
+    response = TestClient(app).post("/api/functions/analyze", json={"language": "python", "code": "def item(items):\n    return items[0]\n", "website": "bot.example"})
+    assert response.status_code == 400
+
+
 def test_analysis_endpoint_returns_a_valid_visualization_contract():
     response = TestClient(app).post(
         "/api/functions/analyze",

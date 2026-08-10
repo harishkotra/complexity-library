@@ -1,5 +1,6 @@
 from app.observability import log_event, redact
 from app.settings import Settings
+from app.rate_limit import SlidingWindowRateLimiter
 
 
 def test_settings_summary_never_contains_api_key():
@@ -19,3 +20,12 @@ def test_structured_event_redacts_secret_values(caplog):
     assert "trace-123" in caplog.text
     assert "private-value" not in caplog.text
     assert "[REDACTED]" in caplog.text
+
+
+def test_sliding_window_rate_limiter_expires_old_events():
+    limiter = SlidingWindowRateLimiter()
+    assert limiter.check("session", 2, 60, now=100)[0] is True
+    assert limiter.check("session", 2, 60, now=101)[0] is True
+    allowed, retry = limiter.check("session", 2, 60, now=102)
+    assert allowed is False and retry > 0
+    assert limiter.check("session", 2, 60, now=161)[0] is True

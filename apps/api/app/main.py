@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from fastapi import BackgroundTasks, Cookie, FastAPI, HTTPException, Response
+from fastapi import BackgroundTasks, Cookie, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
@@ -12,6 +12,7 @@ from app.domain import AlgorithmItem, AnalysisJobResponse, AnalyzeRequest, Analy
 from app.jobs import job_store
 from app.observability import RequestObservabilityMiddleware, log_event
 from app.repositories import build_anonymous_session_repository, build_function_repository
+from app.rate_limit import SlidingWindowRateLimiter
 from app.similarity import find_similar_functions
 from app.sessions import create_anonymous_session, hash_anonymous_session
 from app.settings import get_settings
@@ -21,6 +22,7 @@ app = FastAPI(title="Complexity Library API", version="0.1.0")
 settings = get_settings()
 function_repository = build_function_repository(settings)
 anonymous_session_repository = build_anonymous_session_repository(settings)
+rate_limiter = SlidingWindowRateLimiter()
 app.add_middleware(RequestObservabilityMiddleware)
 app.add_middleware(
     CORSMiddleware,
@@ -45,6 +47,15 @@ def ensure_anonymous_session(response: Response, anonymous_session: str | None) 
     session = create_anonymous_session()
     response.set_cookie("cl_session", session.token, httponly=True, samesite="lax", secure=settings.app_env == "production", max_age=60 * 60 * 24 * 30)
     return session.token
+
+
+def enforce_submission_guards(request: Request, payload: AnalyzeRequest, session_token: str) -> None:
+    if payload.website:
+        raise HTTPException(status_code=400, detail="Submission could not be accepted.")
+    client_ip = request.client.host if request.client else "unknown"
+    allowed, retry_after = rate_limiter.check(f"analysis:{client_ip}:{session_token[:12]}", settings.anonymous_analysis_limit, settings.anonymous_analysis_window_seconds)
+    if not allowed:
+        raise HTTPException(status_code=429, detail="Analysis limit reached. Try again later.", headers={"Retry-After": str(retry_after)})
 
 
 def perform_analysis(request: AnalyzeRequest, anonymous_session_id: str | None = None) -> AnalyzeResponse:
@@ -79,17 +90,19 @@ def health() -> dict[str, str | bool | int | float]:
 
 
 @app.post("/api/functions/analyze", response_model=AnalyzeResponse)
-def analyze(request: AnalyzeRequest, response: Response, anonymous_session: str | None = Cookie(default=None, alias="cl_session")) -> AnalyzeResponse:
+def analyze(request: Request, payload: AnalyzeRequest, response: Response, anonymous_session: str | None = Cookie(default=None, alias="cl_session")) -> AnalyzeResponse:
     session_token = ensure_anonymous_session(response, anonymous_session)
-    return perform_analysis(request, anonymous_session_repository.ensure(session_token).id)
+    enforce_submission_guards(request, payload, session_token)
+    return perform_analysis(payload, anonymous_session_repository.ensure(session_token).id)
 
 
 @app.post("/api/functions/analyses", response_model=AnalysisJobResponse, status_code=202)
-def create_analysis_job(request: AnalyzeRequest, background_tasks: BackgroundTasks, response: Response, anonymous_session: str | None = Cookie(default=None, alias="cl_session")) -> AnalysisJobResponse:
+def create_analysis_job(request: Request, payload: AnalyzeRequest, background_tasks: BackgroundTasks, response: Response, anonymous_session: str | None = Cookie(default=None, alias="cl_session")) -> AnalysisJobResponse:
     session_token = ensure_anonymous_session(response, anonymous_session)
+    enforce_submission_guards(request, payload, session_token)
     session = anonymous_session_repository.ensure(session_token)
     job = job_store.create(hash_anonymous_session(session_token))
-    background_tasks.add_task(run_analysis_job, job.id, request, session.id)
+    background_tasks.add_task(run_analysis_job, job.id, payload, session.id)
     return AnalysisJobResponse(id=job.id, status="queued", events_url=f"/api/functions/analyses/{job.id}/events")
 
 

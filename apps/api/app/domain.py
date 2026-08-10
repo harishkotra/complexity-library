@@ -103,6 +103,7 @@ class AnalyzeRequest(BaseModel):
     code: str = Field(min_length=1, max_length=20_000)
     title: str | None = Field(default=None, max_length=120)
     prompt: str | None = Field(default=None, max_length=1_500)
+    website: str | None = Field(default=None, max_length=255)
 
     @field_validator("code")
     @classmethod

@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:3000"
     analysis_confidence_threshold: float = Field(default=0.85, ge=0, le=1)
     max_code_characters: int = Field(default=20_000, ge=100, le=200_000)
+    anonymous_analysis_limit: int = Field(default=12, ge=1, le=1000)
+    anonymous_analysis_window_seconds: int = Field(default=3600, ge=1, le=86_400)
     llm_enabled: bool = False
     llm_provider: str = "openai"
     llm_model: str = ""
