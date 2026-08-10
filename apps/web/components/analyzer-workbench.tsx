@@ -10,6 +10,7 @@ type Result = {
   visualization: { type: VizType; input_size: number; operation_estimate: number; accessible_summary: string };
   stages: string[];
   function: { title: string; language: string };
+  similar: { id: string; slug: string; title: string; time_complexity: string; score: number; reasons: string[] }[];
 };
 
 function operationEstimate(complexity: Complexity, inputSize: number) {
@@ -122,6 +123,7 @@ export function AnalyzerWorkbench() {
           <div className="visual-panel"><div className="visual-top"><span>operation trace</span><span>{estimated.toLocaleString()} operations</span></div><Visualization type={result.visualization.type} size={size} activeStep={activeStep} /><p className="sr-only">{result.visualization.accessible_summary} Currently showing step {activeStep + 1} of {stepCount}.</p><div className="playback-controls"><button type="button" onClick={() => setPlaying((current) => !current)} aria-label={playing ? "Pause visualization" : "Play visualization"}>{playing ? "Pause" : "Play"}</button><button type="button" onClick={() => { setPlaying(false); setActiveStep((current) => Math.min(stepCount - 1, current + 1)); }}>Step</button><button type="button" onClick={() => { setPlaying(false); setActiveStep(0); }}>Reset</button><span>Step {activeStep + 1}/{stepCount}</span></div><label className="size-control">Input size <input type="range" min="2" max="32" value={size} onChange={(event) => setSize(Number(event.target.value))} /><b>{size}</b></label></div>
           {result.analysis.assumptions.length > 0 && <div className="assumptions"><b>Assumptions</b>{result.analysis.assumptions.map((assumption) => <p key={assumption}>• {assumption}</p>)}</div>}
           {result.analysis.limitations.length > 0 && <div className="limitations"><b>What remains uncertain</b>{result.analysis.limitations.map((limitation) => <p key={limitation}>{limitation}</p>)}</div>}
+          {result.similar.length > 0 && <section className="similar-functions"><div><p className="eyebrow">Related work</p><h3>{result.similar[0].score >= 0.7 ? "This looks almost identical to an existing submission." : "We’ve seen something similar."}</h3></div>{result.similar.map((item) => <a href={`/functions/${item.slug}`} key={item.id}><div><b>{item.title}</b><span>{item.time_complexity}</span></div><p>{item.reasons.slice(0, 2).join(" · ")}</p><small>{Math.round(item.score * 100)}% deterministic match ↗</small></a>)}</section>}
         </div>}
       </section>
     </div>

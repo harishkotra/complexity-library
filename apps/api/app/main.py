@@ -12,6 +12,7 @@ from app.domain import AlgorithmItem, AnalysisJobResponse, AnalyzeRequest, Analy
 from app.jobs import job_store
 from app.observability import RequestObservabilityMiddleware, log_event
 from app.repositories import build_anonymous_session_repository, build_function_repository
+from app.similarity import find_similar_functions
 from app.sessions import create_anonymous_session, hash_anonymous_session
 from app.settings import get_settings
 from app.visualization import build_visualization
@@ -54,7 +55,7 @@ def perform_analysis(request: AnalyzeRequest, anonymous_session_id: str | None =
     visualization = build_visualization(analysis)
     stored = function_repository.find_or_create(request, analysis, visualization, anonymous_session_id)
     log_event("analysis.completed", language=request.language.value, complexity=analysis.time_complexity, confidence=analysis.confidence, cache_hit=stored.cache_hit, durable=stored.durable)
-    return AnalyzeResponse(analysis=analysis, visualization=visualization, stages=STAGES, function=FunctionReference(**stored.__dict__))
+    return AnalyzeResponse(analysis=analysis, visualization=visualization, stages=STAGES, function=FunctionReference(**stored.__dict__), similar=find_similar_functions(request, analysis))
 
 
 def run_analysis_job(job_id: str, request: AnalyzeRequest, anonymous_session_id: str) -> None:

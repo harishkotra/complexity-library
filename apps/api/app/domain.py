@@ -134,6 +134,7 @@ class AnalyzeResponse(BaseModel):
     visualization: VisualizationSpec
     stages: list[str]
     function: FunctionReference
+    similar: list["SimilarFunction"] = Field(default_factory=list)
 
 
 class AnalysisJobResponse(BaseModel):
@@ -160,6 +161,15 @@ class FunctionDetail(FunctionLibraryItem):
     code: str
     analysis: ComplexityAnalysis
     visualization: VisualizationSpec
+
+
+class SimilarFunction(BaseModel):
+    id: str
+    slug: str
+    title: str
+    time_complexity: TimeComplexity
+    score: float = Field(ge=0, le=1)
+    reasons: list[str]
 
 
 class SearchResult(BaseModel):

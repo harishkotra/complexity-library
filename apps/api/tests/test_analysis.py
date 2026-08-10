@@ -146,6 +146,13 @@ def test_submission_status_is_visible_only_to_the_owning_anonymous_session():
     assert stranger.get(f"/api/functions/submissions/{function_id}").status_code == 404
 
 
+def test_analysis_returns_deterministic_similarity_evidence():
+    response = TestClient(app).post("/api/functions/analyze", json={"language": "python", "code": "def search(items, target):\n    for index, item in enumerate(items):\n        if item == target:\n            return index\n    return -1\n"})
+    similar = response.json()["similar"]
+    assert similar[0]["slug"] == "python-linear-search"
+    assert "Same normalized syntax structure" in similar[0]["reasons"]
+
+
 def test_analysis_endpoint_returns_a_valid_visualization_contract():
     response = TestClient(app).post(
         "/api/functions/analyze",
