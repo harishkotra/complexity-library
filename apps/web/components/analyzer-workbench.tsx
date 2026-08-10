@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 
 type Complexity = "O(1)" | "O(log n)" | "O(n)" | "O(n log n)" | "O(n²)" | "O(2ⁿ)" | "unknown";
 type VizType = "constant" | "linear_scan" | "logarithmic_halving" | "n_log_n" | "quadratic_grid" | "recursion_tree";
@@ -39,13 +39,13 @@ const samples: Record<string, { title: string; code: string }> = {
 const stages = ["Parsing function", "Building syntax facts", "Detecting loops and recursion", "Determining complexity", "Building visualization"];
 const serverStageIndex: Record<string, number> = { "Parsed function": 0, "Built syntax facts": 1, "Detected loops and recursion": 2, "Determined complexity": 3, "Built visualization": 4 };
 
-function Visualization({ type, size }: { type: VizType; size: number }) {
-  if (type === "quadratic_grid") return <div className="viz-grid" aria-hidden="true">{Array.from({ length: Math.min(64, size * size) }, (_, index) => <span className={index % (Math.min(size, 8) + 1) === 0 ? "hot" : ""} key={index} />)}</div>;
-  if (type === "logarithmic_halving") return <div className="viz-halving" aria-hidden="true">{[size, Math.max(1, Math.floor(size / 2)), Math.max(1, Math.floor(size / 4)), 1].map((value, index) => <div key={`${value}-${index}`}><b>{value}</b>{index < 3 && <span>↓</span>}</div>)}</div>;
-  if (type === "n_log_n") return <div className="viz-levels" aria-hidden="true">{[1, 2, 4, 8].map((count, row) => <div key={count}>{Array.from({ length: count }, (_, index) => <span key={index} style={{ opacity: 1 - row * 0.14 }} />)}</div>)}</div>;
-  if (type === "recursion_tree") return <div className="viz-tree" aria-hidden="true">{[1, 2, 4, 8].map((count, row) => <div key={count}>{Array.from({ length: count }, (_, index) => <span key={index} className={row === 3 ? "leaf" : ""} />)}</div>)}</div>;
-  if (type === "constant") return <div className="viz-line constant" aria-hidden="true">{[0, 1, 2].map((item) => <span key={item} />)}</div>;
-  return <div className="viz-line" aria-hidden="true">{Array.from({ length: Math.min(size, 18) }, (_, index) => <span key={index} className={index === 7 ? "hot" : ""} />)}</div>;
+function Visualization({ type, size, activeStep }: { type: VizType; size: number; activeStep: number }) {
+  if (type === "quadratic_grid") return <div className="viz-grid" aria-hidden="true">{Array.from({ length: Math.min(64, size * size) }, (_, index) => <span className={`${index % (Math.min(size, 8) + 1) === 0 ? "hot" : ""} ${index <= activeStep ? "active-trace" : ""}`} key={index} />)}</div>;
+  if (type === "logarithmic_halving") return <div className="viz-halving" aria-hidden="true">{[size, Math.max(1, Math.floor(size / 2)), Math.max(1, Math.floor(size / 4)), 1].map((value, index) => <div key={`${value}-${index}`} className={index <= activeStep ? "active-trace" : ""}><b>{value}</b>{index < 3 && <span>↓</span>}</div>)}</div>;
+  if (type === "n_log_n") return <div className="viz-levels" aria-hidden="true">{[1, 2, 4, 8].map((count, row) => <div key={count}>{Array.from({ length: count }, (_, index) => <span key={index} className={row <= activeStep ? "active-trace" : ""} style={{ opacity: 1 - row * 0.14 }} />)}</div>)}</div>;
+  if (type === "recursion_tree") return <div className="viz-tree" aria-hidden="true">{[1, 2, 4, 8].map((count, row) => <div key={count}>{Array.from({ length: count }, (_, index) => <span key={index} className={`${row === 3 ? "leaf" : ""} ${row <= activeStep ? "active-trace" : ""}`} />)}</div>)}</div>;
+  if (type === "constant") return <div className="viz-line constant" aria-hidden="true">{[0, 1, 2].map((item) => <span key={item} className={item <= activeStep ? "active-trace" : ""} />)}</div>;
+  return <div className="viz-line" aria-hidden="true">{Array.from({ length: Math.min(size, 18) }, (_, index) => <span key={index} className={`${index === 7 ? "hot" : ""} ${index <= activeStep ? "active-trace" : ""}`} />)}</div>;
 }
 
 export function AnalyzerWorkbench() {
@@ -56,7 +56,12 @@ export function AnalyzerWorkbench() {
   const [result, setResult] = useState<Result | null>(null);
   const [error, setError] = useState("");
   const [size, setSize] = useState(8);
+  const [activeStep, setActiveStep] = useState(0);
+  const [playing, setPlaying] = useState(false);
   const estimated = useMemo(() => result ? operationEstimate(result.analysis.time_complexity, size) : 0, [result, size]);
+  const stepCount = useMemo(() => result ? ({ quadratic_grid: Math.min(64, size * size), logarithmic_halving: 4, n_log_n: 4, recursion_tree: 4, constant: 3, linear_scan: Math.min(size, 18) }[result.visualization.type] ?? 1) : 1, [result, size]);
+  useEffect(() => { setActiveStep(0); setPlaying(false); }, [result?.function.title, size]);
+  useEffect(() => { if (!playing || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return; const timer = window.setTimeout(() => setActiveStep((current) => { if (current >= stepCount - 1) { setPlaying(false); return current; } return current + 1; }), 340); return () => window.clearTimeout(timer); }, [playing, activeStep, stepCount]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -114,7 +119,7 @@ export function AnalyzerWorkbench() {
           <div className="result-kicker"><span>analysis complete</span><span>{result.function.language}</span></div>
           <div className="complexity-readout"><div><small>time</small><strong>{result.analysis.time_complexity}</strong></div><div><small>space</small><strong>{result.analysis.space_complexity}</strong></div><p>{Math.round(result.analysis.confidence * 100)}%<span> confidence</span></p></div>
           <p className="reasoning">{result.analysis.reasoning}</p>
-          <div className="visual-panel"><div className="visual-top"><span>operation trace</span><span>{estimated.toLocaleString()} operations</span></div><Visualization type={result.visualization.type} size={size} /><p className="sr-only">{result.visualization.accessible_summary}</p><label className="size-control">Input size <input type="range" min="2" max="32" value={size} onChange={(event) => setSize(Number(event.target.value))} /><b>{size}</b></label></div>
+          <div className="visual-panel"><div className="visual-top"><span>operation trace</span><span>{estimated.toLocaleString()} operations</span></div><Visualization type={result.visualization.type} size={size} activeStep={activeStep} /><p className="sr-only">{result.visualization.accessible_summary} Currently showing step {activeStep + 1} of {stepCount}.</p><div className="playback-controls"><button type="button" onClick={() => setPlaying((current) => !current)} aria-label={playing ? "Pause visualization" : "Play visualization"}>{playing ? "Pause" : "Play"}</button><button type="button" onClick={() => { setPlaying(false); setActiveStep((current) => Math.min(stepCount - 1, current + 1)); }}>Step</button><button type="button" onClick={() => { setPlaying(false); setActiveStep(0); }}>Reset</button><span>Step {activeStep + 1}/{stepCount}</span></div><label className="size-control">Input size <input type="range" min="2" max="32" value={size} onChange={(event) => setSize(Number(event.target.value))} /><b>{size}</b></label></div>
           {result.analysis.assumptions.length > 0 && <div className="assumptions"><b>Assumptions</b>{result.analysis.assumptions.map((assumption) => <p key={assumption}>• {assumption}</p>)}</div>}
           {result.analysis.limitations.length > 0 && <div className="limitations"><b>What remains uncertain</b>{result.analysis.limitations.map((limitation) => <p key={limitation}>{limitation}</p>)}</div>}
         </div>}
