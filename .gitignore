@@ -12,3 +12,4 @@ __pycache__/
 *.md
 !README.md
 supabase/README.md
+package-lock.json

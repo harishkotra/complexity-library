@@ -54,6 +54,8 @@ GitHub Actions runs the same API suite, shared schema typecheck, and production 
 
 `pnpm install` also enables the repository pre-commit hook, which runs the web linter and API tests before a local commit.
 
+The workspace explicitly permits the audited `unrs-resolver` native build required by the Next.js toolchain, so `pnpm dev:web` can run without an interactive build-approval prompt.
+
 ## Run with containers
 
 ```bash
