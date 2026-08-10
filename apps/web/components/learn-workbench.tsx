@@ -1,0 +1,17 @@
+"use client";
+
+import { useMemo, useState } from "react";
+
+const lessons = [
+  { key: "constant", label: "O(1)", title: "Fixed work stays fixed.", body: "Reading one known position does the same amount of work whether the collection has 8 or 8,000 items.", formula: (n: number) => 3 },
+  { key: "logarithmic", label: "O(log n)", title: "Halving changes the scale.", body: "Binary search discards about half the remaining candidates with each comparison.", formula: (n: number) => Math.ceil(Math.log2(n)) },
+  { key: "linear", label: "O(n)", title: "One pass grows with input.", body: "A linear scan may touch each item once, so twice the input means roughly twice the work.", formula: (n: number) => n },
+  { key: "quadratic", label: "O(n²)", title: "Nested work multiplies.", body: "Comparing every item with every other item produces a grid of operations.", formula: (n: number) => n * n },
+];
+
+export function LearnWorkbench() {
+  const [lessonKey, setLessonKey] = useState("linear"); const [size, setSize] = useState(8);
+  const lesson = lessons.find((item) => item.key === lessonKey) ?? lessons[2];
+  const values = useMemo(() => [Math.max(2, Math.floor(size / 2)), size, Math.min(32, size * 2)].map((n) => ({ n, operations: lesson.formula(n) })), [lesson, size]);
+  return <main className="app-shell learn-page"><nav className="nav"><a className="brand" href="/"><span className="brand-mark">↗</span> Complexity<br /><em>Library</em></a><div className="nav-links"><a href="/">Analyze</a><a href="/library">Library</a><a href="/algorithms">Algorithms</a><a href="/compare">Compare</a></div><a className="nav-action" href="/#analyze">Analyze function <span>→</span></a></nav><header className="library-head"><p className="eyebrow">Interactive Big-O lessons</p><h1>Make growth<br /><i>visible.</i></h1><p>Change the input. Read the operations. Use the same mental model when you inspect your own function.</p></header><section className="learn-layout"><aside aria-label="Lessons">{lessons.map((item) => <button key={item.key} className={item.key === lesson.key ? "selected" : ""} onClick={() => setLessonKey(item.key)}><span>{item.label}</span>{item.title}</button>)}</aside><article className="lesson-panel"><p className="eyebrow">{lesson.label} growth</p><h2>{lesson.title}</h2><p>{lesson.body}</p><div className="lesson-visual" aria-label={`${lesson.label} operation estimate`}><div className={`lesson-bars ${lesson.key}`}>{values.map((value) => <div key={value.n}><span style={{ height: `${Math.max(9, Math.min(100, value.operations / Math.max(...values.map((item) => item.operations)) * 100))}%` }} /><b>{value.operations.toLocaleString()}</b><small>n = {value.n}</small></div>)}</div><p className="sr-only">At input sizes {values.map((value) => `${value.n}, the estimate is ${value.operations} operations`).join("; ")}.</p></div><label className="size-control">Reference input <input type="range" min="4" max="24" value={size} onChange={(event) => setSize(Number(event.target.value))} /><b>n = {size}</b></label><div className="lesson-check"><b>Try it yourself</b><p>{lesson.key === "quadratic" ? "Find the nested loop: one loop supplies the rows and the other supplies the columns." : lesson.key === "logarithmic" ? "Count how many times you can halve the input before one item remains." : "Identify which single operation repeats as the input grows."}</p></div></article></section></main>;
+}

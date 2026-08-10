@@ -50,6 +50,14 @@ cd apps/api && uv run pytest
 cd ../web && ./node_modules/.bin/next build
 ```
 
+## Run with containers
+
+```bash
+docker compose up --build
+```
+
+Open `http://localhost:3000`. The MVP deliberately runs without an LLM or a configured Supabase project; add those environment variables when enabling durable persistence and agent fallback.
+
 ## Configuration
 
 The application works without an LLM configuration for supported deterministic Python functions. Set Supabase variables to use durable server-side persistence; never expose a service-role key to the browser.
