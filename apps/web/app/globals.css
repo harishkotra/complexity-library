@@ -37,3 +37,8 @@ h1,h2,h3,p { margin-top:0; } h1,h2 { font-family:var(--font-display),Georgia,ser
 @media (max-width:820px) { .compare-controls { grid-template-columns:1fr; }.compare-head { grid-template-columns:1fr; gap:12px; }.compare-head article:last-child { text-align:left; }.compare-head > span { display:none; } }
 @media (max-width:820px) { .learn-layout { grid-template-columns:1fr; }.learn-layout aside { display:grid; grid-template-columns:1fr 1fr; }.lesson-panel { padding:20px; }.lesson-panel h2 { font-size:38px; } }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior:auto; }.hero-signal { transform:none; } }
+
+.lesson-bars.quadratic span,.lesson-bars.exponential span,.lesson-bars.factorial span,.lesson-bars.calculation span { background:var(--coral); }
+.lesson-bars.logarithmic span,.lesson-bars.nlogn span,.lesson-bars.space span { background:var(--moss); }
+.lesson-check button { margin-top:13px; border:1px solid var(--ink); padding:8px 10px; background:var(--surface); color:var(--ink); font:500 10px var(--font-mono),monospace; text-transform:uppercase; letter-spacing:.05em; }
+.lesson-check button:hover { background:var(--ink); color:white; }

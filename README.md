@@ -50,6 +50,8 @@ cd apps/api && uv run pytest
 cd ../web && ./node_modules/.bin/next build
 ```
 
+GitHub Actions runs the same API suite, shared schema typecheck, and production web build on every pull request and push to `main`.
+
 ## Run with containers
 
 ```bash
