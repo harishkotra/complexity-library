@@ -1,0 +1,19 @@
+name: Feature request
+description: Propose a focused improvement.
+title: "feature: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      placeholder: Describe the user-facing problem rather than an implementation.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed direction
+      placeholder: Explain scope, trade-offs, and how it preserves deterministic-first analysis.
+    validations:
+      required: true

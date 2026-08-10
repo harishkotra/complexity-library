@@ -1,0 +1,14 @@
+node_modules/
+.pnpm-store/
+.next/
+dist/
+__pycache__/
+.pytest_cache/
+.venv/
+.env
+*.pyc
+
+# Working project-management documents remain local by request.
+*.md
+!README.md
+supabase/README.md

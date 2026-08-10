@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://complexity-library.dev/schemas/visualization-spec/v1.json",
+  "title": "Complexity Library Visualization Spec",
+  "type": "object",
+  "required": ["schema_version", "type", "input_size", "operation_estimate", "steps", "annotations", "accessible_summary", "controls"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "type": {"enum": ["constant", "linear_scan", "logarithmic_halving", "n_log_n", "quadratic_grid", "recursion_tree"]},
+    "input_size": {"type": "integer", "minimum": 1, "maximum": 128},
+    "operation_estimate": {"type": "integer", "minimum": 0, "maximum": 20000},
+    "steps": {"type": "array", "maxItems": 256, "items": {"type": "object", "required": ["operation", "label"], "properties": {"operation": {"type": "string"}, "label": {"type": "string"}, "index": {"type": "integer"}, "level": {"type": "integer"}, "row": {"type": "integer"}, "column": {"type": "integer"}}}},
+    "annotations": {"type": "array", "maxItems": 12, "items": {"type": "string"}},
+    "accessible_summary": {"type": "string", "minLength": 1},
+    "controls": {"type": "object", "required": ["min", "max", "default", "step"], "properties": {"min": {"type": "integer"}, "max": {"type": "integer"}, "default": {"type": "integer"}, "step": {"type": "integer"}}}
+  },
+  "additionalProperties": false
+}

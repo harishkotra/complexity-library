@@ -1,0 +1,26 @@
+name: Bug report
+description: Report a reproducible problem in Complexity Library.
+title: "bug: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: "Do not include API keys, cookies, or private submitted code."
+  - type: textarea
+    id: observed
+    attributes:
+      label: What happened?
+      placeholder: Describe the observed behavior and expected behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction steps
+      placeholder: Include a minimal safe example, environment, and commands.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit

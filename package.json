@@ -1,0 +1,10 @@
+{
+  "name": "complexity-library",
+  "private": true,
+  "packageManager": "pnpm@11.9.0",
+  "scripts": {
+    "dev:web": "pnpm --filter @complexity-library/web dev",
+    "build": "pnpm --filter @complexity-library/web build",
+    "lint": "pnpm --filter @complexity-library/web lint"
+  }
+}
