@@ -8,7 +8,7 @@ Complexity Library is an algorithm visualizer, code knowledge library, and inter
 
 ## Current capabilities
 
-- Deterministic Python AST analysis for constant, linear, logarithmic, n-log-n, quadratic, cubic, and branching-recursion patterns.
+- Deterministic Python, JavaScript, and TypeScript parsing for constant, linear, logarithmic, n-log-n, quadratic, cubic, and branching-recursion patterns.
 - Structured time/space complexity, confidence, assumptions, limitations, AST fingerprints, and visualization specs.
 - Browser-native visual workbench with real server-sent analysis stages.
 - Public library/detail routes with a small curated catalog and functional search/filter controls.
@@ -53,6 +53,10 @@ cd ../web && ./node_modules/.bin/next build
 ## Configuration
 
 The application works without an LLM configuration for supported deterministic Python functions. Set Supabase variables to use durable server-side persistence; never expose a service-role key to the browser.
+
+### Supported analysis subset
+
+Python uses the standard AST. JavaScript and TypeScript use tree-sitter and currently support top-level function declarations, loops, nested loops, conventional binary search, direct recursion, array allocation, and built-in sorting recognition. Unsupported constructs reduce confidence only when they are encountered; the app does not claim support for languages it cannot parse.
 
 ## Contributing
 

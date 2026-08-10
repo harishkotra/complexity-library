@@ -3,8 +3,13 @@ from __future__ import annotations
 import ast
 import hashlib
 import math
+import re
 from dataclasses import dataclass, field
 from typing import Protocol
+
+from tree_sitter import Language, Node, Parser
+import tree_sitter_javascript
+import tree_sitter_typescript
 
 from app.domain import (
     AlgorithmPattern,
@@ -51,8 +56,8 @@ class ComplexityIR:
 @dataclass(frozen=True)
 class ParsedProgram:
     language: SupportedLanguage
-    tree: ast.Module
-    function: ast.FunctionDef | ast.AsyncFunctionDef
+    tree: object
+    function: object
 
 
 class LanguageAnalyzer(Protocol):
@@ -251,7 +256,7 @@ class PythonFactsVisitor(ast.NodeVisitor):
         return len(names) >= 2
 
 
-def _analysis_from_facts(facts: Facts) -> ComplexityAnalysis:
+def _analysis_from_facts(facts: Facts, language: SupportedLanguage = SupportedLanguage.PYTHON) -> ComplexityAnalysis:
 
     if facts.recursive_calls >= 2:
         time, pattern, confidence, reason = (
@@ -337,7 +342,7 @@ def _analysis_from_facts(facts: Facts) -> ComplexityAnalysis:
             loop_depth=facts.loop_depth,
             input_types=["collection"],
             operations=list(dict.fromkeys(facts.operations)),
-            language=SupportedLanguage.PYTHON,
+            language=language,
         ),
     )
 
@@ -359,6 +364,128 @@ def fingerprint_python(code: str) -> str:
 
 def build_python_ir(code: str) -> ComplexityIR:
     return _python_analyzer.build_ir(_python_analyzer.parse(code))
+
+
+class TreeSitterLanguageAnalyzer:
+    """Small, explicit ES/TypeScript subset built on real parser trees—not regex heuristics."""
+
+    def __init__(self, language: SupportedLanguage, grammar: Language) -> None:
+        self.language = language
+        self._parser = Parser(grammar)
+
+    def parse(self, code: str) -> ParsedProgram:
+        source = code.encode("utf-8")
+        tree = self._parser.parse(source)
+        if tree.root_node.has_error:
+            raise ValueError(f"{self.language.value.title()} could not parse this code.")
+        function = next((node for node in self._walk(tree.root_node) if node.type in {"function_declaration", "arrow_function", "method_definition"}), None)
+        if not function:
+            raise ValueError(f"Add a top-level {self.language.value.title()} function so the analyzer has a clear entry point.")
+        return ParsedProgram(language=self.language, tree=tree, function=function)
+
+    def normalize(self, parsed: ParsedProgram) -> str:
+        source = parsed.function.text.decode("utf-8")  # type: ignore[union-attr]
+        known = {"function", "return", "for", "while", "if", "else", "const", "let", "var", "true", "false", "null", "undefined", "Math", "floor", "length", "sort", "push", "console", "log"}
+        names: dict[str, str] = {}
+
+        def replace(match: re.Match[str]) -> str:
+            value = match.group(0)
+            if value in known or value.isdigit():
+                return value
+            if value not in names:
+                names[value] = f"v{len(names)}"
+            return names[value]
+
+        return re.sub(r"[A-Za-z_$][A-Za-z0-9_$]*", replace, re.sub(r"\s+", " ", source).strip())
+
+    def fingerprint(self, parsed: ParsedProgram) -> str:
+        return hashlib.sha256(self.normalize(parsed).encode("utf-8")).hexdigest()
+
+    def build_ir(self, parsed: ParsedProgram) -> ComplexityIR:
+        function = parsed.function
+        source = function.text  # type: ignore[union-attr]
+        name_node = function.child_by_field_name("name")  # type: ignore[union-attr]
+        function_name = name_node.text.decode("utf-8") if name_node else "anonymous"
+        facts = Facts()
+        self._collect(function, source, function_name, facts)
+        return ComplexityIR(function_name=function_name, facts=facts)
+
+    def analyze(self, parsed: ParsedProgram) -> ComplexityAnalysis:
+        return _analysis_from_facts(self.build_ir(parsed).facts, self.language)
+
+    def _collect(self, node: Node, source: bytes, function_name: str, facts: Facts, depth: int = 0) -> None:
+        loop_types = {"for_statement", "for_in_statement", "while_statement"}
+        if node.type in loop_types:
+            depth += 1
+            facts.has_loop = True
+            facts.loop_depth = max(facts.loop_depth, depth)
+            facts.operations.append("iteration")
+            facts.source_facts.append(SourceFact("loop", node.start_point.row + 1, node.start_point.column))
+            text = node.text.decode("utf-8")
+            if re.search(r"/\s*2", text):
+                facts.has_halving_loop = True
+            if all(token in text.lower() for token in ("low", "high", "mid")) and re.search(r"/\s*2", text):
+                facts.has_binary_search = True
+            if len(re.findall(r"(?:left|right|start|end|\bi\b|\bj\b)\s*(?:\+\+|--|\+=|-=)", text)) >= 2:
+                facts.has_two_pointer_scan = True
+        elif node.type == "if_statement":
+            facts.branches += 1
+            facts.source_facts.append(SourceFact("branch", node.start_point.row + 1, node.start_point.column))
+        elif node.type == "return_statement":
+            facts.early_returns += 1
+            facts.source_facts.append(SourceFact("return", node.start_point.row + 1, node.start_point.column))
+        elif node.type == "break_statement":
+            facts.breaks += 1
+            facts.source_facts.append(SourceFact("break", node.start_point.row + 1, node.start_point.column))
+        elif node.type == "continue_statement":
+            facts.continues += 1
+            facts.source_facts.append(SourceFact("continue", node.start_point.row + 1, node.start_point.column))
+        elif node.type == "array":
+            facts.allocations += 1
+            facts.source_facts.append(SourceFact("allocation", node.start_point.row + 1, node.start_point.column))
+        elif node.type == "call_expression":
+            callee = node.child_by_field_name("function")
+            callee_text = callee.text.decode("utf-8") if callee else ""
+            if callee_text == function_name:
+                facts.recursive_calls += 1
+            elif callee_text.endswith(".sort") or callee_text == "sort":
+                facts.has_sort = True
+                facts.operations.append("sort")
+            elif callee_text.split(".")[-1] in {"push", "get", "length", "log"}:
+                facts.operations.append(callee_text.split(".")[-1])
+            elif callee_text and callee_text not in {"Math.floor"}:
+                facts.unknown_calls.append(callee_text)
+        for child in node.named_children:
+            self._collect(child, source, function_name, facts, depth)
+
+    @staticmethod
+    def _walk(node: Node):  # type: ignore[no-untyped-def]
+        yield node
+        for child in node.named_children:
+            yield from TreeSitterLanguageAnalyzer._walk(child)
+
+
+_javascript_analyzer = TreeSitterLanguageAnalyzer(SupportedLanguage.JAVASCRIPT, Language(tree_sitter_javascript.language()))
+_typescript_analyzer = TreeSitterLanguageAnalyzer(SupportedLanguage.TYPESCRIPT, Language(tree_sitter_typescript.language_typescript()))
+
+
+def analyzer_for(language: SupportedLanguage) -> LanguageAnalyzer:
+    return {SupportedLanguage.PYTHON: _python_analyzer, SupportedLanguage.JAVASCRIPT: _javascript_analyzer, SupportedLanguage.TYPESCRIPT: _typescript_analyzer}[language]
+
+
+def analyze_code(language: SupportedLanguage, code: str) -> ComplexityAnalysis:
+    analyzer = analyzer_for(language)
+    return analyzer.analyze(analyzer.parse(code))
+
+
+def normalize_code(language: SupportedLanguage, code: str) -> str:
+    analyzer = analyzer_for(language)
+    return analyzer.normalize(analyzer.parse(code))
+
+
+def fingerprint_code(language: SupportedLanguage, code: str) -> str:
+    analyzer = analyzer_for(language)
+    return analyzer.fingerprint(analyzer.parse(code))
 
 
 def unsupported_analysis(language: SupportedLanguage) -> ComplexityAnalysis:

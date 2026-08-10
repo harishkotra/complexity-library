@@ -2,7 +2,7 @@ import pytest
 from pydantic import ValidationError
 from fastapi.testclient import TestClient
 
-from app.analysis import analyze_python, build_python_ir, fingerprint_python, normalize_python
+from app.analysis import analyze_code, analyze_python, build_python_ir, fingerprint_python, normalize_python
 from app.domain import AlgorithmPattern, SpaceComplexity, TimeComplexity
 from app.visualization import build_visualization
 from app.main import app
@@ -58,6 +58,26 @@ def test_ir_records_control_flow_with_source_locations():
     assert ir.facts.breaks == 1
     assert ir.facts.continues == 1
     assert [(fact.kind, fact.line) for fact in ir.facts.source_facts] == [("for_loop", 2), ("branch", 3), ("continue", 4), ("branch", 5), ("break", 6), ("return", 7)]
+
+
+@pytest.mark.parametrize(
+    ("language", "code", "time"),
+    [
+        ("javascript", "function scan(items) { for (const item of items) { console.log(item); } }", TimeComplexity.LINEAR),
+        ("javascript", "function find(items, target) { let low = 0, high = items.length - 1; while (low <= high) { const mid = Math.floor((low + high) / 2); if (items[mid] < target) low = mid + 1; else high = mid - 1; } return -1; }", TimeComplexity.LOGARITHMIC),
+        ("typescript", "function pairs(items: number[]): boolean { for (const left of items) { for (const right of items) { if (left === right) return true; } } return false; }", TimeComplexity.QUADRATIC),
+    ],
+)
+def test_javascript_and_typescript_are_parsed_with_real_language_adapters(language, code, time):
+    analysis = analyze_code(language, code)
+    assert analysis.time_complexity == time
+    assert analysis.signature.language.value == language
+
+
+def test_javascript_submission_uses_the_same_typed_api_contract():
+    response = TestClient(app).post("/api/functions/analyze", json={"language": "javascript", "code": "function first(items) { return items[0]; }"})
+    assert response.status_code == 200
+    assert response.json()["analysis"]["time_complexity"] == "O(1)"
 
 
 def test_analysis_endpoint_returns_a_valid_visualization_contract():

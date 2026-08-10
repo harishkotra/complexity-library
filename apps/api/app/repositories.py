@@ -6,7 +6,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Literal, Protocol
 
-from app.analysis import fingerprint_python, normalize_python
+from app.analysis import fingerprint_code, normalize_code
 from app.curated import curated_function, curated_summaries
 from app.domain import AnalyzeRequest, ComplexityAnalysis, FunctionDetail, FunctionLibraryItem, VisualizationSpec
 from app.settings import Settings
@@ -52,7 +52,7 @@ class InMemoryFunctionRepository:
         self._by_key: dict[str, PersistedFunction] = {}
 
     def find_or_create(self, request: AnalyzeRequest, analysis: ComplexityAnalysis, visualization: VisualizationSpec, anonymous_session_id: str | None = None) -> PersistedFunction:
-        normalized = normalize_python(request.code) if request.language == "python" else request.code.strip()
+        normalized = normalize_code(request.language, request.code)
         key = hashlib.sha256(f"{request.language}:{normalized}:{ANALYZER_VERSION}".encode("utf-8")).hexdigest()
         existing = self._by_key.get(key)
         if existing:
@@ -92,13 +92,13 @@ class SupabaseFunctionRepository:
         self.client = create_client(settings.supabase_url, settings.supabase_service_role_key)
 
     def find_or_create(self, request: AnalyzeRequest, analysis: ComplexityAnalysis, visualization: VisualizationSpec, anonymous_session_id: str | None = None) -> PersistedFunction:
-        normalized = normalize_python(request.code) if request.language == "python" else request.code.strip()
+        normalized = normalize_code(request.language, request.code)
         code_hash = hashlib.sha256(f"{request.language}:{normalized}:{ANALYZER_VERSION}".encode("utf-8")).hexdigest()
         existing = self.client.table("functions").select("id,slug,title,language").eq("code_hash", code_hash).eq("analyzer_version", ANALYZER_VERSION).maybe_single().execute().data
         if existing:
             return PersistedFunction(id=existing["id"], slug=existing["slug"], title=existing["title"], language=existing["language"], cache_hit=True, durable=True)
         title = request.title.strip() if request.title else "Untitled function"
-        fingerprint = fingerprint_python(request.code) if request.language == "python" else None
+        fingerprint = fingerprint_code(request.language, request.code)
         slug = f"{_slugify(title)}-{code_hash[:7]}"
         payload = {
             "slug": slug,

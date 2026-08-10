@@ -30,6 +30,11 @@ const sample = `def contains_duplicate(items):
             if items[left] == items[right]:
                 return True
     return False`;
+const samples: Record<string, { title: string; code: string }> = {
+  python: { title: "Duplicate value check", code: sample },
+  javascript: { title: "Linear search", code: "function linearSearch(items, target) {\n  for (let index = 0; index < items.length; index += 1) {\n    if (items[index] === target) return index;\n  }\n  return -1;\n}" },
+  typescript: { title: "Linear search", code: "function linearSearch(items: number[], target: number): number {\n  for (let index = 0; index < items.length; index += 1) {\n    if (items[index] === target) return index;\n  }\n  return -1;\n}" },
+};
 
 const stages = ["Parsing function", "Building syntax facts", "Detecting loops and recursion", "Determining complexity", "Building visualization"];
 const serverStageIndex: Record<string, number> = { "Parsed function": 0, "Built syntax facts": 1, "Detected loops and recursion": 2, "Determined complexity": 3, "Built visualization": 4 };
@@ -83,12 +88,19 @@ export function AnalyzerWorkbench() {
     }
   }
 
+  function changeLanguage(nextLanguage: string) {
+    setLanguage(nextLanguage);
+    setTitle(samples[nextLanguage].title);
+    setCode(samples[nextLanguage].code);
+    setResult(null); setError(""); setStage(-1);
+  }
+
   return <section id="analyze" className="workbench-section">
     <div className="section-heading"><div><p className="eyebrow">Your function, in motion</p><h2>Trace the dominant<br /><i>work.</i></h2></div><p>Static reasoning first. No code execution. No chat layer.</p></div>
     <div className="workbench">
       <form className="submission" onSubmit={submit}>
         <div className="form-head"><span>function input</span><span className="dot-label"><i /> safe static analysis</span></div>
-        <label>Language<select value={language} onChange={(event) => setLanguage(event.target.value)}><option value="python">Python</option><option value="javascript">JavaScript (planned)</option><option value="typescript">TypeScript (planned)</option></select></label>
+        <label>Language<select value={language} onChange={(event) => changeLanguage(event.target.value)}><option value="python">Python</option><option value="javascript">JavaScript</option><option value="typescript">TypeScript</option></select></label>
         <label>Function title<input value={title} maxLength={120} onChange={(event) => setTitle(event.target.value)} placeholder="Name this function" /></label>
         <label>Code<textarea value={code} onChange={(event) => setCode(event.target.value)} spellCheck="false" aria-describedby="code-help" /></label>
         <p id="code-help" className="form-help">Paste a top-level function. It is parsed, never executed.</p>

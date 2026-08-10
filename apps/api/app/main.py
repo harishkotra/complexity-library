@@ -6,7 +6,7 @@ from fastapi import BackgroundTasks, Cookie, FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
-from app.analysis import analyze_python, unsupported_analysis
+from app.analysis import analyze_code
 from app.curated import curated_algorithms
 from app.domain import AlgorithmItem, AnalysisJobResponse, AnalyzeRequest, AnalyzeResponse, FunctionDetail, FunctionLibraryItem, FunctionReference, SearchResult, SupportedLanguage
 from app.jobs import job_store
@@ -47,7 +47,7 @@ def ensure_anonymous_session(response: Response, anonymous_session: str | None) 
 
 def perform_analysis(request: AnalyzeRequest, session_token: str | None = None) -> AnalyzeResponse:
     try:
-        analysis = analyze_python(request.code) if request.language == SupportedLanguage.PYTHON else unsupported_analysis(request.language)
+        analysis = analyze_code(request.language, request.code)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     visualization = build_visualization(analysis)
